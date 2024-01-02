@@ -65,9 +65,6 @@ namespace Tolltech.BayanMeter
             Console.WriteLine($"Start Bots {DateTime.Now}");
 
             var wc = CreateWorkaroundClient();
-            var gg = wc.GetAsync("https://google.com").GetAwaiter().GetResult();
-            Console.WriteLine(gg.Content.ReadAsStringAsync().GetAwaiter().GetResult().Substring(0, 1000));
-            Console.WriteLine(gg.StatusCode);
 
             var argsFileName = "args.txt";
             var botSettingsStr = args.Length > 0 ? args[0] :
