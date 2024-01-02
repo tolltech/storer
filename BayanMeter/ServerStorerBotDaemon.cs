@@ -54,7 +54,15 @@ namespace Tolltech.Storer
 
                 log.Info($"RecieveMessage {message.Chat.Id} {message.MessageId}");
 
-                await SaveMessageIfPhotoAsync(message).ConfigureAwait(false);
+                try
+                {
+                    await SaveMessageIfPhotoAsync(message, client).ConfigureAwait(false);
+                }
+                catch (Exception e)
+                {
+                    await client.SendTextMessageAsync(message.Chat.Id, $"Error. {e.Message} {e.StackTrace}").ConfigureAwait(false);
+                    throw;
+                }
             }
             catch (Exception e)
             {
@@ -78,7 +86,7 @@ namespace Tolltech.Storer
             return Task.CompletedTask;
         }
 
-        private Task SaveMessageIfPhotoAsync(Message message)
+        private Task SaveMessageIfPhotoAsync(Message message, ITelegramBotClient client)
         {
             if (message?.Type != MessageType.Video)
             {
@@ -102,19 +110,16 @@ namespace Tolltech.Storer
             var bytes = telegramClient.GetFile(video.FileId);
 
             //var messageDto = Convert(message, bytes);
-            SaveVideo(video, bytes, message);
-
-            log.Info($"SavedMessage {message.Chat.Id} {message.MessageId}");
-
-            return Task.CompletedTask;
+            log.Info($"Saving {message.Chat.Id} {message.MessageId}");
+            return SaveVideo(video, bytes, message, client);
         }
 
-        private void SaveVideo(Video video, byte[] bytes, Message message)
+        private Task SaveVideo(Video video, byte[] bytes, Message message, ITelegramBotClient client)
         {
             if (storerCustomSettings?.RootDir == null)
             {
                 log.Info($"Video was not saved. RootDir is null");
-                return;
+                return Task.CompletedTask;
             }
 
             var folderName = $"{message.Chat.Title}_" +
@@ -130,6 +135,8 @@ namespace Tolltech.Storer
             var fullFileName = Path.Combine(fullFolderPath,
                 $"{new string(message.MessageId.ToString().Where(char.IsLetterOrDigit).ToArray())}_{video.FileName}");
             File.WriteAllBytes(fullFileName, bytes);
+
+            return client.SendTextMessageAsync(message.Chat.Id, $"Saved {fullFolderPath} {fullFileName}");
         }
 
         //private static string GetBayanMessage(BayanResultDto bayanMetric)
