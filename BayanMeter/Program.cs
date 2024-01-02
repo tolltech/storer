@@ -2,7 +2,9 @@
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
@@ -28,12 +30,41 @@ namespace Tolltech.BayanMeter
         }
 
         private static TelegramBotClient client;
+        
+        public static HttpClient CreateWorkaroundClient()
+        {
+            SocketsHttpHandler handler = new SocketsHttpHandler
+            {
+                ConnectCallback = IPv4ConnectAsync
+            };
+            return new HttpClient(handler);
+
+            static async ValueTask<Stream> IPv4ConnectAsync(SocketsHttpConnectionContext context, CancellationToken cancellationToken)
+            {
+                // By default, we create dual-mode sockets:
+                // Socket socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+
+                Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                socket.NoDelay = true;
+
+                try
+                {
+                    await socket.ConnectAsync(context.DnsEndPoint, cancellationToken).ConfigureAwait(false);
+                    return new NetworkStream(socket, ownsSocket: true);
+                }
+                catch
+                {
+                    socket.Dispose();
+                    throw;
+                }
+            }
+        }
 
         static void Main(string[] args)
         {
             Console.WriteLine($"Start Bots {DateTime.Now}");
 
-            var wc = new HttpClient();
+            var wc = CreateWorkaroundClient();
             var gg = wc.GetAsync("https://google.com").GetAwaiter().GetResult();
             Console.WriteLine(gg.Content.ReadAsStringAsync().GetAwaiter().GetResult().Substring(0, 1000));
             Console.WriteLine(gg.StatusCode);
@@ -55,7 +86,7 @@ namespace Tolltech.BayanMeter
              
                 Console.WriteLine($"Start bot {token}");
 
-                client = new TelegramBotClient(token);
+                client = new TelegramBotClient(token, wc);
 
                 var receiverOptions = new ReceiverOptions
                 {
