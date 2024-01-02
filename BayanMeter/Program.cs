@@ -1,5 +1,7 @@
 ﻿using System;
 using System.IO;
+using System.Net;
+using System.Net.Http;
 using System.Threading;
 using Newtonsoft.Json;
 using Telegram.Bot;
@@ -30,6 +32,11 @@ namespace Tolltech.BayanMeter
         static void Main(string[] args)
         {
             Console.WriteLine($"Start Bots {DateTime.Now}");
+
+            var wc = new HttpClient();
+            var gg = wc.GetAsync("https://google.com").GetAwaiter().GetResult();
+            Console.WriteLine(gg.Content.ReadAsStringAsync().GetAwaiter().GetResult().Substring(0, 1000));
+            Console.WriteLine(gg.StatusCode);
 
             var argsFileName = "args.txt";
             var botSettingsStr = args.Length > 0 ? args[0] :
