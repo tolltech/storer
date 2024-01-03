@@ -66,6 +66,9 @@ namespace Tolltech.Storer
                     {
                         messageLeft[message.Chat.Id] = (message.Text, cnt, message.MessageId);
                     }
+
+                    if (message?.Type != MessageType.Video)
+                        return;
                 }
 
                 log.Info($"RecieveMessage {message.Chat.Id} {message.MessageId}");
@@ -136,24 +139,19 @@ namespace Tolltech.Storer
 
             await client.SendTextMessageAsync(message.Chat.Id, $"Downloading...", replyToMessageId: message.MessageId)
                 .ConfigureAwait(false);
-
-            var bytes = telegramClient.GetFile(video.FileId);
-
+            
             //var messageDto = Convert(message, bytes);
             log.Info($"Saving {message.Chat.Id} {message.MessageId}");
-            await SaveVideo(video, bytes, message, client).ConfigureAwait(false);
+            await SaveVideo(video, message, client).ConfigureAwait(false);
         }
 
-        private async Task SaveVideo(Video video, byte[] bytes, Message message, ITelegramBotClient client)
+        private async Task SaveVideo(Video video, Message message, ITelegramBotClient client)
         {
             if (storerCustomSettings?.RootDir == null)
             {
                 log.Info($"Video was not saved. RootDir is null");
                 return;
             }
-
-            await client.SendTextMessageAsync(message.Chat.Id, $"Saving...", replyToMessageId: message.MessageId)
-                .ConfigureAwait(false);
 
             var folderName = GetFolderName(message);
 
@@ -169,10 +167,21 @@ namespace Tolltech.Storer
                 $"{new string(message.MessageId.ToString().Where(char.IsLetterOrDigit).ToArray())}_{video.FileName}";
 
             var ext = Path.GetExtension(defaultFileName);
+            if (string.IsNullOrWhiteSpace(ext))
+            {
+                ext = ".mp4";
+                defaultFileName += ext;
+            }
 
             var fileName = customFileName != null ? customFileName + ext : defaultFileName;
             var fullFileName = Path.Combine(fullFolderPath,
                 fileName);
+            
+            var bytes = telegramClient.GetFile(video.FileId);
+            
+            await client.SendTextMessageAsync(message.Chat.Id, $"Saving...", replyToMessageId: message.MessageId)
+                .ConfigureAwait(false);
+            
             await File.WriteAllBytesAsync(fullFileName, bytes).ConfigureAwait(false);
 
             await ChangeTitleAsync(fullFileName, fileName, client, message).ConfigureAwait(false);
@@ -263,9 +272,7 @@ namespace Tolltech.Storer
                 return msg;
             }
             
-            if (string.IsNullOrWhiteSpace(message.MediaGroupId)) return null;
-
-            if (mediaGroupsHistory.TryGetValue(message.MediaGroupId, out var msg2))
+            if (!string.IsNullOrWhiteSpace(message.MediaGroupId) && mediaGroupsHistory.TryGetValue(message.MediaGroupId, out var msg2))
             {
                 delta = message.MessageId - msg2.OriginalMessageId;
                 return msg2.Text;
