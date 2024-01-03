@@ -91,32 +91,34 @@ namespace Tolltech.Storer
             return Task.CompletedTask;
         }
 
-        private Task SaveMessageIfPhotoAsync(Message message, ITelegramBotClient client)
+        private async Task SaveMessageIfPhotoAsync(Message message, ITelegramBotClient client)
         {
             if (message?.Type != MessageType.Video)
             {
-                return Task.CompletedTask;
+                return;
             }
 
             var video = message.Video;
 
             if (video == null)
             {
-                return Task.CompletedTask;
+                return;
             }
 
             if (!storerCustomSettings.AllowedUsers.Contains(message.From?.Username)
                 && !storerCustomSettings.AllowedUsers.Contains(message.From?.Id.ToString()))
             {
                 log.Info($"Video was not saved. User {message.From?.Username} {message.From?.Id} is not allowed");
-                return Task.CompletedTask;
+                return;
             }
 
+            await client.SendTextMessageAsync(message.Chat.Id, $"Downloading...", replyToMessageId: message.MessageId).ConfigureAwait(false);
+            
             var bytes = telegramClient.GetFile(video.FileId);
 
             //var messageDto = Convert(message, bytes);
             log.Info($"Saving {message.Chat.Id} {message.MessageId}");
-            return SaveVideo(video, bytes, message, client);
+            await SaveVideo(video, bytes, message, client).ConfigureAwait(false);
         }
 
         private async Task SaveVideo(Video video, byte[] bytes, Message message, ITelegramBotClient client)
