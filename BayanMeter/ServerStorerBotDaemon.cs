@@ -37,6 +37,8 @@ namespace Tolltech.Storer
             };
         }
 
+        private static readonly Dictionary<(long ChatId, int MessageId), string> messageHistory = new();
+
         public async Task HandleUpdateAsync(ITelegramBotClient client, Update update,
             CancellationToken cancellationToken)
         {
@@ -51,6 +53,8 @@ namespace Tolltech.Storer
                 {
                     return;
                 }
+
+                messageHistory[(message.Chat.Id, message.MessageId)] = message.Text;
 
                 log.Info($"RecieveMessage {message.Chat.Id} {message.MessageId}");
 
@@ -115,13 +119,15 @@ namespace Tolltech.Storer
             return SaveVideo(video, bytes, message, client);
         }
 
-        private Task SaveVideo(Video video, byte[] bytes, Message message, ITelegramBotClient client)
+        private async Task SaveVideo(Video video, byte[] bytes, Message message, ITelegramBotClient client)
         {
             if (storerCustomSettings?.RootDir == null)
             {
                 log.Info($"Video was not saved. RootDir is null");
-                return Task.CompletedTask;
+                return;
             }
+
+            await client.SendTextMessageAsync(message.Chat.Id, $"Saving...", replyToMessageId: message.MessageId).ConfigureAwait(false);
 
             var folderName = GetFolderName(message);
 
@@ -132,7 +138,7 @@ namespace Tolltech.Storer
                 Directory.CreateDirectory(fullFolderPath);
             }
 
-            var customFileName = GetFileNameFromMessage(message.Text);
+            var customFileName = GetFileNameFromMessage(message);
             var defaultFileName =
                 $"{new string(message.MessageId.ToString().Where(char.IsLetterOrDigit).ToArray())}_{video.FileName}";
 
@@ -140,7 +146,9 @@ namespace Tolltech.Storer
                 customFileName ?? defaultFileName);
             File.WriteAllBytes(fullFileName, bytes);
 
-            return client.SendTextMessageAsync(message.Chat.Id, $"Saved {fullFolderPath} {fullFileName}");
+            await client.SendTextMessageAsync(message.Chat.Id, $"Saved {fullFolderPath} {fullFileName}",
+                    replyToMessageId: message.MessageId)
+                .ConfigureAwait(false);
         }
 
         private static string GetFolderName(Message message)
@@ -149,20 +157,20 @@ namespace Tolltech.Storer
                                     $"{new string(message.Chat.Id.ToString().Where(char.IsLetterOrDigit).ToArray())}";
             var messageText = message.Text;
 
-            var customFolderName = GetFolderNameFromMessage(messageText);
+            var customFolderName = GetFolderNameFromMessage(message);
 
             return customFolderName ?? defaultFolderName;
         }
 
-        private static string GetFolderNameFromMessage(string messageText)
+        private static string GetFolderNameFromMessage(Message message)
         {
-            var args = GetArgsFromMessageText(messageText);
+            var args = GetArgsFromMessageText(message);
 
             if (args.TryGetValue("dir", out var dir)) return dir;
             return null;
         }
 
-        private static string GetFileNameFromMessage(string messageText)
+        private static string GetFileNameFromMessage(Message messageText)
         {
             var args = GetArgsFromMessageText(messageText);
 
@@ -170,8 +178,10 @@ namespace Tolltech.Storer
             return null;
         }
 
-        private static Dictionary<string, string> GetArgsFromMessageText(string messageText)
+        private static Dictionary<string, string> GetArgsFromMessageText(Message message)
         {
+            var messageText = message.Text ?? GetPreviousMessageText(message);
+            
             if (string.IsNullOrWhiteSpace(messageText)) return new Dictionary<string, string>();
 
             var args = messageText.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries)
@@ -180,6 +190,13 @@ namespace Tolltech.Storer
                 .GroupBy(x => x[0])
                 .ToDictionary(x => x.Key, x => x.First()[1]);
             return args;
+        }
+
+        private static string GetPreviousMessageText(Message message)
+        {
+            return messageHistory.TryGetValue((message.Chat.Id, message.MessageId), out var msg)
+                ? msg
+                : null;
         }
 
         //private static string GetBayanMessage(BayanResultDto bayanMetric)
