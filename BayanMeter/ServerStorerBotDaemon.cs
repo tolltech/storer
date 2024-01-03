@@ -40,6 +40,8 @@ namespace Tolltech.Storer
         private static readonly Dictionary<(long ChatId, int MessageId), string> messageHistory = new();
         private static readonly Dictionary<string, (string Text, int OriginalMessageId)> mediaGroupsHistory = new();
 
+        private static readonly Dictionary<long, (string Text, int LeftCount, int OriginalMessageId)> messageLeft = new();
+
         public async Task HandleUpdateAsync(ITelegramBotClient client, Update update,
             CancellationToken cancellationToken)
         {
@@ -56,7 +58,15 @@ namespace Tolltech.Storer
                 }
 
                 if (!string.IsNullOrWhiteSpace(message.Text))
+                {
                     messageHistory[(message.Chat.Id, message.MessageId)] = message.Text;
+
+                    var cntStr = new string(message.Text.TakeWhile(char.IsDigit).ToArray());
+                    if (int.TryParse(cntStr, out var cnt))
+                    {
+                        messageLeft[message.Chat.Id] = (message.Text, cnt, message.MessageId);
+                    }
+                }
 
                 log.Info($"RecieveMessage {message.Chat.Id} {message.MessageId}");
 
@@ -69,6 +79,16 @@ namespace Tolltech.Storer
                     await client.SendTextMessageAsync(message.Chat.Id, $"Error. {e.Message} {e.StackTrace}")
                         .ConfigureAwait(false);
                     throw;
+                }
+                finally
+                {
+                    if (messageLeft.TryGetValue(message.Chat.Id, out var left))
+                    {
+                        if (left.LeftCount == 0)
+                            messageLeft.Remove(message.Chat.Id);
+                        else
+                            messageLeft[message.Chat.Id] = (left.Text, left.LeftCount - 1, left.OriginalMessageId);
+                    }
                 }
             }
             catch (Exception e)
@@ -235,19 +255,26 @@ namespace Tolltech.Storer
         private static string GetPreviousMessageText(Message message, out int? delta)
         {
             delta = null;
+
             if (messageHistory.TryGetValue((message.Chat.Id, message.MessageId - 1), out var msg))
             {
                 if (!string.IsNullOrWhiteSpace(message.MediaGroupId))
                     mediaGroupsHistory[message.MediaGroupId] = (msg, message.MessageId - 1);
                 return msg;
             }
-
+            
             if (string.IsNullOrWhiteSpace(message.MediaGroupId)) return null;
 
             if (mediaGroupsHistory.TryGetValue(message.MediaGroupId, out var msg2))
             {
                 delta = message.MessageId - msg2.OriginalMessageId;
                 return msg2.Text;
+            }
+            
+            if (messageLeft.TryGetValue(message.Chat.Id, out var left))
+            {
+                delta = message.MessageId - left.OriginalMessageId; 
+                return left.Text;
             }
 
             return null;
