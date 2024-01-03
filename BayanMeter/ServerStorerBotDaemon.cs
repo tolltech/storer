@@ -146,13 +146,37 @@ namespace Tolltech.Storer
 
             var ext = Path.GetExtension(defaultFileName);
 
+            var fileName = customFileName != null ? customFileName + ext : defaultFileName;
             var fullFileName = Path.Combine(fullFolderPath,
-                customFileName != null ? customFileName + ext : defaultFileName);
+                fileName);
             await File.WriteAllBytesAsync(fullFileName, bytes).ConfigureAwait(false);
+
+            await ChangeTitleAsync(fullFileName, fileName, client, message).ConfigureAwait(false);
 
             await client.SendTextMessageAsync(message.Chat.Id, $"Saved {fullFileName}",
                     replyToMessageId: message.MessageId)
                 .ConfigureAwait(false);
+        }
+
+        private async Task ChangeTitleAsync(string fullFilePath, string fileName, ITelegramBotClient client, Message message)
+        {
+            try
+            {
+                using var tfile = TagLib.File.Create(fullFilePath);
+            
+                var title = tfile.Tag.Title;
+                if (string.IsNullOrWhiteSpace(title)) return;
+
+                // change title in the file
+                tfile.Tag.Title = fileName;
+                tfile.Save();
+            }
+            catch (Exception e)
+            {
+                await client.SendTextMessageAsync(message.Chat.Id, $"Error changing title to {fileName}. {e.Message}",
+                        replyToMessageId: message.MessageId)
+                    .ConfigureAwait(false);
+            }
         }
 
         private static string GetFolderName(Message message)
