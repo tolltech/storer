@@ -60,7 +60,8 @@ namespace Tolltech.Storer
                 }
                 catch (Exception e)
                 {
-                    await client.SendTextMessageAsync(message.Chat.Id, $"Error. {e.Message} {e.StackTrace}").ConfigureAwait(false);
+                    await client.SendTextMessageAsync(message.Chat.Id, $"Error. {e.Message} {e.StackTrace}")
+                        .ConfigureAwait(false);
                     throw;
                 }
             }
@@ -122,8 +123,7 @@ namespace Tolltech.Storer
                 return Task.CompletedTask;
             }
 
-            var folderName = $"{message.Chat.Title}_" +
-                             $"{new string(message.Chat.Id.ToString().Where(char.IsLetterOrDigit).ToArray())}";
+            var folderName = GetFolderName(message);
 
             var fullFolderPath = Path.Combine(storerCustomSettings.RootDir, folderName);
 
@@ -132,11 +132,54 @@ namespace Tolltech.Storer
                 Directory.CreateDirectory(fullFolderPath);
             }
 
+            var customFileName = GetFileNameFromMessage(message.Text);
+            var defaultFileName =
+                $"{new string(message.MessageId.ToString().Where(char.IsLetterOrDigit).ToArray())}_{video.FileName}";
+
             var fullFileName = Path.Combine(fullFolderPath,
-                $"{new string(message.MessageId.ToString().Where(char.IsLetterOrDigit).ToArray())}_{video.FileName}");
+                customFileName ?? defaultFileName);
             File.WriteAllBytes(fullFileName, bytes);
 
             return client.SendTextMessageAsync(message.Chat.Id, $"Saved {fullFolderPath} {fullFileName}");
+        }
+
+        private static string GetFolderName(Message message)
+        {
+            var defaultFolderName = $"{message.Chat.Title}_" +
+                                    $"{new string(message.Chat.Id.ToString().Where(char.IsLetterOrDigit).ToArray())}";
+            var messageText = message.Text;
+
+            var customFolderName = GetFolderNameFromMessage(messageText);
+
+            return customFolderName ?? defaultFolderName;
+        }
+
+        private static string GetFolderNameFromMessage(string messageText)
+        {
+            var args = GetArgsFromMessageText(messageText);
+
+            if (args.TryGetValue("dir", out var dir)) return dir;
+            return null;
+        }
+
+        private static string GetFileNameFromMessage(string messageText)
+        {
+            var args = GetArgsFromMessageText(messageText);
+
+            if (args.TryGetValue("file", out var dir)) return dir;
+            return null;
+        }
+
+        private static Dictionary<string, string> GetArgsFromMessageText(string messageText)
+        {
+            if (string.IsNullOrWhiteSpace(messageText)) return new Dictionary<string, string>();
+
+            var args = messageText.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => x.Split(new[] { "=" }, StringSplitOptions.RemoveEmptyEntries))
+                .Where(x => x.Length == 2)
+                .GroupBy(x => x[0])
+                .ToDictionary(x => x.Key, x => x.First()[1]);
+            return args;
         }
 
         //private static string GetBayanMessage(BayanResultDto bayanMetric)
