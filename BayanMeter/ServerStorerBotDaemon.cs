@@ -142,11 +142,13 @@ namespace Tolltech.Storer
             var defaultFileName =
                 $"{new string(message.MessageId.ToString().Where(char.IsLetterOrDigit).ToArray())}_{video.FileName}";
 
-            var fullFileName = Path.Combine(fullFolderPath,
-                customFileName ?? defaultFileName);
-            File.WriteAllBytes(fullFileName, bytes);
+            var ext = Path.GetExtension(defaultFileName);
 
-            await client.SendTextMessageAsync(message.Chat.Id, $"Saved {fullFolderPath} {fullFileName}",
+            var fullFileName = Path.Combine(fullFolderPath,
+                customFileName != null ? customFileName + ext : defaultFileName);
+            await File.WriteAllBytesAsync(fullFileName, bytes).ConfigureAwait(false);
+
+            await client.SendTextMessageAsync(message.Chat.Id, $"Saved {fullFileName}",
                     replyToMessageId: message.MessageId)
                 .ConfigureAwait(false);
         }
@@ -155,8 +157,6 @@ namespace Tolltech.Storer
         {
             var defaultFolderName = $"{message.Chat.Title}_" +
                                     $"{new string(message.Chat.Id.ToString().Where(char.IsLetterOrDigit).ToArray())}";
-            var messageText = message.Text;
-
             var customFolderName = GetFolderNameFromMessage(message);
 
             return customFolderName ?? defaultFolderName;
@@ -166,7 +166,7 @@ namespace Tolltech.Storer
         {
             var args = GetArgsFromMessageText(message);
 
-            if (args.TryGetValue("dir", out var dir)) return dir;
+            if (args.TryGetValue("folder", out var dir)) return dir;
             return null;
         }
 
@@ -187,8 +187,8 @@ namespace Tolltech.Storer
             var args = messageText.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(x => x.Split(new[] { "=" }, StringSplitOptions.RemoveEmptyEntries))
                 .Where(x => x.Length == 2)
-                .GroupBy(x => x[0])
-                .ToDictionary(x => x.Key, x => x.First()[1]);
+                .GroupBy(x => x[0].Trim().ToLower())
+                .ToDictionary(x => x.Key, x => x.First()[1].Trim());
             return args;
         }
 
