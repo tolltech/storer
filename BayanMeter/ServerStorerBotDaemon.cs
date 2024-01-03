@@ -194,7 +194,7 @@ namespace Tolltech.Storer
 
         private static string GetPreviousMessageText(Message message)
         {
-            return messageHistory.TryGetValue((message.Chat.Id, message.MessageId), out var msg)
+            return messageHistory.TryGetValue((message.Chat.Id, message.MessageId - 1), out var msg)
                 ? msg
                 : null;
         }
