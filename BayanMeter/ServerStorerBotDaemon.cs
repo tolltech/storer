@@ -38,6 +38,7 @@ namespace Tolltech.Storer
         }
 
         private static readonly Dictionary<(long ChatId, int MessageId), string> messageHistory = new();
+        private static readonly Dictionary<string, (string Text, int OriginalMessageId)> mediaGroupsHistory = new();
 
         public async Task HandleUpdateAsync(ITelegramBotClient client, Update update,
             CancellationToken cancellationToken)
@@ -54,7 +55,8 @@ namespace Tolltech.Storer
                     return;
                 }
 
-                messageHistory[(message.Chat.Id, message.MessageId)] = message.Text;
+                if (!string.IsNullOrWhiteSpace(message.Text))
+                    messageHistory[(message.Chat.Id, message.MessageId)] = message.Text;
 
                 log.Info($"RecieveMessage {message.Chat.Id} {message.MessageId}");
 
@@ -112,8 +114,9 @@ namespace Tolltech.Storer
                 return;
             }
 
-            await client.SendTextMessageAsync(message.Chat.Id, $"Downloading...", replyToMessageId: message.MessageId).ConfigureAwait(false);
-            
+            await client.SendTextMessageAsync(message.Chat.Id, $"Downloading...", replyToMessageId: message.MessageId)
+                .ConfigureAwait(false);
+
             var bytes = telegramClient.GetFile(video.FileId);
 
             //var messageDto = Convert(message, bytes);
@@ -129,7 +132,8 @@ namespace Tolltech.Storer
                 return;
             }
 
-            await client.SendTextMessageAsync(message.Chat.Id, $"Saving...", replyToMessageId: message.MessageId).ConfigureAwait(false);
+            await client.SendTextMessageAsync(message.Chat.Id, $"Saving...", replyToMessageId: message.MessageId)
+                .ConfigureAwait(false);
 
             var folderName = GetFolderName(message);
 
@@ -158,12 +162,13 @@ namespace Tolltech.Storer
                 .ConfigureAwait(false);
         }
 
-        private async Task ChangeTitleAsync(string fullFilePath, string fileName, ITelegramBotClient client, Message message)
+        private async Task ChangeTitleAsync(string fullFilePath, string fileName, ITelegramBotClient client,
+            Message message)
         {
             try
             {
                 using var tfile = TagLib.File.Create(fullFilePath);
-            
+
                 var title = tfile.Tag.Title;
                 if (string.IsNullOrWhiteSpace(title)) return;
 
@@ -190,7 +195,7 @@ namespace Tolltech.Storer
 
         private static string GetFolderNameFromMessage(Message message)
         {
-            var args = GetArgsFromMessageText(message);
+            var args = GetArgsFromMessageText(message, out _);
 
             if (args.TryGetValue("folder", out var dir)) return dir;
             return null;
@@ -198,16 +203,25 @@ namespace Tolltech.Storer
 
         private static string GetFileNameFromMessage(Message messageText)
         {
-            var args = GetArgsFromMessageText(messageText);
+            var args = GetArgsFromMessageText(messageText, out var delta);
 
-            if (args.TryGetValue("file", out var dir)) return dir;
+            if (args.TryGetValue("file", out var dir))
+            {
+                if (delta.HasValue)
+                {
+                    dir += $"_{delta.Value}";
+                }
+                
+                return dir;
+            }
             return null;
         }
 
-        private static Dictionary<string, string> GetArgsFromMessageText(Message message)
+        private static Dictionary<string, string> GetArgsFromMessageText(Message message, out int? delta)
         {
-            var messageText = message.Text ?? GetPreviousMessageText(message);
-            
+            delta = null;
+            var messageText = message.Text ?? GetPreviousMessageText(message, out delta);
+
             if (string.IsNullOrWhiteSpace(messageText)) return new Dictionary<string, string>();
 
             var args = messageText.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries)
@@ -218,11 +232,25 @@ namespace Tolltech.Storer
             return args;
         }
 
-        private static string GetPreviousMessageText(Message message)
+        private static string GetPreviousMessageText(Message message, out int? delta)
         {
-            return messageHistory.TryGetValue((message.Chat.Id, message.MessageId - 1), out var msg)
-                ? msg
-                : null;
+            delta = null;
+            if (messageHistory.TryGetValue((message.Chat.Id, message.MessageId - 1), out var msg))
+            {
+                if (!string.IsNullOrWhiteSpace(message.MediaGroupId))
+                    mediaGroupsHistory[message.MediaGroupId] = (msg, message.MessageId - 1);
+                return msg;
+            }
+
+            if (string.IsNullOrWhiteSpace(message.MediaGroupId)) return null;
+
+            if (mediaGroupsHistory.TryGetValue(message.MediaGroupId, out var msg2))
+            {
+                delta = message.MessageId - msg2.OriginalMessageId;
+                return msg2.Text;
+            }
+
+            return null;
         }
 
         //private static string GetBayanMessage(BayanResultDto bayanMetric)
