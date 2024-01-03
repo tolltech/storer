@@ -33,10 +33,11 @@ namespace Tolltech.BayanMeter
         
         public static HttpClient CreateWorkaroundClient()
         {
-            SocketsHttpHandler handler = new SocketsHttpHandler
+            var handler = new SocketsHttpHandler
             {
                 ConnectCallback = IPv4ConnectAsync
             };
+
             return new HttpClient(handler);
 
             static async ValueTask<Stream> IPv4ConnectAsync(SocketsHttpConnectionContext context, CancellationToken cancellationToken)
@@ -66,6 +67,8 @@ namespace Tolltech.BayanMeter
 
             var wc = CreateWorkaroundClient();
 
+            //wc.DefaultRequestVersion = HttpVersion.Version10;
+
             var argsFileName = "args.txt";
             var botSettingsStr = args.Length > 0 ? args[0] :
                 File.Exists(argsFileName) ? File.ReadAllText(argsFileName) : string.Empty;
@@ -83,7 +86,7 @@ namespace Tolltech.BayanMeter
              
                 Console.WriteLine($"Start bot {token}");
 
-                client = new TelegramBotClient(token, wc);
+                client = new TelegramBotClient(new TelegramBotClientOptions(token, "http://localhost:8081"), wc);
 
                 var receiverOptions = new ReceiverOptions
                 {

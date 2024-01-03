@@ -15,14 +15,16 @@ namespace Tolltech.TelegramCore
 
         public byte[] GetFile(string fileId)
         {
-            using (var stream = new MemoryStream())
-            {
-                var file = client.GetFileAsync(fileId).GetAwaiter().GetResult();
-                client.DownloadFileAsync(file.FilePath, stream).GetAwaiter().GetResult();
-                stream.Seek(0, SeekOrigin.Begin);
+            var file = client.GetFileAsync(fileId).GetAwaiter().GetResult();
 
-                return stream.ReadToByteArray();
-            }
+            //for using without local server
+            // using var stream = new MemoryStream();
+            // client.DownloadFileAsync(file.FilePath, stream).GetAwaiter().GetResult();
+            // stream.Seek(0, SeekOrigin.Begin);
+            //
+            // return stream.ReadToByteArray();
+
+            return File.ReadAllBytes(file.FilePath!);
         }
     }
 }
