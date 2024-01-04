@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Collections.Generic;
+using System.IO;
 
 namespace Tolltech.CoreLib.Helpers
 {
@@ -16,6 +17,11 @@ namespace Tolltech.CoreLib.Helpers
                 }
                 return ms.ToArray();
             }
+        }
+
+        public static TValue SafeGet<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, TValue def = default)
+        {
+            return dict.TryGetValue(key, out var v) ? v : def;
         }
     }
 }

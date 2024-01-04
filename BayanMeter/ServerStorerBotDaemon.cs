@@ -10,6 +10,7 @@ using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Tolltech.CoreLib;
+using Tolltech.CoreLib.Helpers;
 using Tolltech.TelegramCore;
 using File = System.IO.File;
 
@@ -215,9 +216,17 @@ namespace Tolltech.Storer
 
         private static string GetFolderName(Message message)
         {
-            var defaultFolderName = $"{message.Chat.Title}_" +
-                                    $"{new string(message.Chat.Id.ToString().Where(char.IsLetterOrDigit).ToArray())}";
+            var defaultFolderName = $"{message.Chat.Title}";
             var customFolderName = GetFolderNameFromMessage(message);
+
+            if (customFolderName != null)
+            {
+                var args = GetArgsFromMessageText(message, out _);
+                var useTitleStr = args.SafeGet("title", "true");
+                var useTitle = bool.Parse(useTitleStr);
+                if (useTitle)
+                    customFolderName = Path.Combine(message.Chat.Title ?? string.Empty, customFolderName);
+            }
 
             return customFolderName ?? defaultFolderName;
         }
