@@ -175,6 +175,12 @@ namespace Tolltech.Storer
             }
 
             var fileName = customFileName != null ? customFileName + ext : defaultFileName;
+
+            if (customFileName == null)
+            {
+                fileName = $"{DateTime.UtcNow:yyMMdd}_{fileName}";
+            }
+            
             var fullFileName = Path.Combine(fullFolderPath,
                 fileName);
             
@@ -185,7 +191,7 @@ namespace Tolltech.Storer
             
             await File.WriteAllBytesAsync(fullFileName, bytes).ConfigureAwait(false);
 
-            await ChangeTitleAsync(fullFileName, fileName, client, message).ConfigureAwait(false);
+            await ChangeTitleAsync(fullFileName, fileName, client, message, ext).ConfigureAwait(false);
 
             await client.SendTextMessageAsync(message.Chat.Id, $"Saved {fullFileName}",
                     replyToMessageId: message.MessageId)
@@ -193,10 +199,12 @@ namespace Tolltech.Storer
         }
 
         private async Task ChangeTitleAsync(string fullFilePath, string fileName, ITelegramBotClient client,
-            Message message)
+            Message message, string ext)
         {
             try
             {
+                if (ext.ToLower() == ".mov") return;
+                
                 using var tfile = TagLib.File.Create(fullFilePath);
 
                 var title = tfile.Tag.Title;
