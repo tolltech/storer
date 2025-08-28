@@ -164,8 +164,14 @@ namespace Tolltech.Storer
             }
 
             var customFileName = GetFileNameFromMessage(message);
+            var videoFileName = video.FileName ?? string.Empty;
+            if (videoFileName.Any(c => c == '@' || c == '!'))
+            {
+                videoFileName = string.Empty;
+            }
+            
             var defaultFileName =
-                $"{new string(message.MessageId.ToString().Where(char.IsLetterOrDigit).ToArray())}_{video.FileName}";
+                $"{new string(message.MessageId.ToString().Where(char.IsLetterOrDigit).ToArray())}_{videoFileName}";
 
             var ext = Path.GetExtension(defaultFileName);
             if (string.IsNullOrWhiteSpace(ext))
