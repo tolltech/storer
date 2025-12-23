@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using log4net;
@@ -38,7 +39,8 @@ namespace Tolltech.BayanMeter
         private static readonly Dictionary<(long ChatId, int MessageId), string> messageHistory = new();
         private static readonly Dictionary<string, (string Text, int OriginalMessageId)> mediaGroupsHistory = new();
 
-        private static readonly Dictionary<long, (string Text, int LeftCount, int OriginalMessageId)> messageLeft = new();
+        private static readonly Dictionary<long, (string Text, int LeftCount, int OriginalMessageId)> messageLeft =
+            new();
 
         public async Task HandleUpdateAsync(ITelegramBotClient client, Update update,
             CancellationToken cancellationToken)
@@ -73,11 +75,28 @@ namespace Tolltech.BayanMeter
 
                 try
                 {
+                    if (!storerCustomSettings.AllowedUsers.Contains(message.From?.Username)
+                        && !storerCustomSettings.AllowedUsers.Contains(message.From?.Id.ToString()))
+                    {
+                        log.Info(
+                            $"Video was not saved. User {message.From?.Username} {message.From?.Id} is not allowed");
+                        return;
+                    }
+
+                    if (message.Text?.StartsWith("/ip") ?? false)
+                    {
+                        if (string.IsNullOrWhiteSpace(storerCustomSettings.PassKey)) return;
+                        if (!message.Text.Contains(storerCustomSettings.PassKey)) return;
+                        await SendIp(message, client);
+                        return;
+                    }
+
                     await SaveMessageIfPhotoAsync(message, client).ConfigureAwait(false);
                 }
                 catch (Exception e)
                 {
-                    await client.SendTextMessageAsync(message.Chat.Id, $"Error. {e.Message} {e.StackTrace}", cancellationToken: cancellationToken);
+                    await client.SendTextMessageAsync(message.Chat.Id, $"Error. {e.Message} {e.StackTrace}",
+                        cancellationToken: cancellationToken);
                     throw;
                 }
                 finally
@@ -98,6 +117,15 @@ namespace Tolltech.BayanMeter
             }
         }
 
+        private async Task SendIp(Message message, ITelegramBotClient client)
+        {
+            using var httpClient = new HttpClient();
+            var ip = await httpClient.GetStringAsync("https://ifconfig.me/ip");
+            await client.SendTextMessageAsync(message.Chat.Id, $"{ip}", replyToMessageId: message.MessageId);
+            await client.SendTextMessageAsync(message.Chat.Id, $"http://{ip}", replyToMessageId: message.MessageId);
+            await client.SendTextMessageAsync(message.Chat.Id, $"https://{ip}", replyToMessageId: message.MessageId);
+        }
+
         public Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception,
             CancellationToken cancellationToken)
         {
@@ -115,7 +143,7 @@ namespace Tolltech.BayanMeter
 
         private async Task SaveMessageIfPhotoAsync(Message message, ITelegramBotClient client)
         {
-            if (message?.Type != MessageType.Video)
+            if (message.Type != MessageType.Video)
             {
                 return;
             }
@@ -127,16 +155,9 @@ namespace Tolltech.BayanMeter
                 return;
             }
 
-            if (!storerCustomSettings.AllowedUsers.Contains(message.From?.Username)
-                && !storerCustomSettings.AllowedUsers.Contains(message.From?.Id.ToString()))
-            {
-                log.Info($"Video was not saved. User {message.From?.Username} {message.From?.Id} is not allowed");
-                return;
-            }
-
             await client.SendTextMessageAsync(message.Chat.Id, $"Downloading...", replyToMessageId: message.MessageId)
                 .ConfigureAwait(false);
-            
+
             //var messageDto = Convert(message, bytes);
             log.Info($"Saving {message.Chat.Id} {message.MessageId}");
             await SaveVideo(video, message, client).ConfigureAwait(false);
@@ -161,11 +182,11 @@ namespace Tolltech.BayanMeter
 
             var customFileName = GetFileNameFromMessage(message);
             var videoFileName = video.FileName ?? string.Empty;
-            if (videoFileName.Any(c => c == '@' || c == '!'))
+            if (videoFileName.Any(c => c is '@' or '!'))
             {
                 videoFileName = string.Empty;
             }
-            
+
             var defaultFileName =
                 $"{new string(message.MessageId.ToString().Where(char.IsLetterOrDigit).ToArray())}_{videoFileName}";
 
@@ -182,15 +203,15 @@ namespace Tolltech.BayanMeter
             {
                 fileName = $"{DateTime.UtcNow:yyMMdd}_{fileName}";
             }
-            
+
             var fullFileName = Path.Combine(fullFolderPath,
                 fileName);
-            
+
             var bytes = telegramClient.GetFile(video.FileId);
-            
+
             await client.SendTextMessageAsync(message.Chat.Id, $"Saving...", replyToMessageId: message.MessageId)
                 .ConfigureAwait(false);
-            
+
             await File.WriteAllBytesAsync(fullFileName, bytes).ConfigureAwait(false);
 
             await ChangeTitleAsync(fullFileName, fileName, client, message, ext).ConfigureAwait(false);
@@ -206,7 +227,7 @@ namespace Tolltech.BayanMeter
             try
             {
                 if (ext.ToLower() == ".mov") return;
-                
+
                 using var tfile = TagLib.File.Create(fullFilePath);
 
                 var title = tfile.Tag.Title;
@@ -258,9 +279,10 @@ namespace Tolltech.BayanMeter
                 {
                     dir += $"_{delta.Value}";
                 }
-                
+
                 return dir;
             }
+
             return null;
         }
 
@@ -289,16 +311,17 @@ namespace Tolltech.BayanMeter
                     mediaGroupsHistory[message.MediaGroupId] = (msg, message.MessageId - 1);
                 return msg;
             }
-            
-            if (!string.IsNullOrWhiteSpace(message.MediaGroupId) && mediaGroupsHistory.TryGetValue(message.MediaGroupId, out var msg2))
+
+            if (!string.IsNullOrWhiteSpace(message.MediaGroupId) &&
+                mediaGroupsHistory.TryGetValue(message.MediaGroupId, out var msg2))
             {
                 delta = message.MessageId - msg2.OriginalMessageId;
                 return msg2.Text;
             }
-            
+
             if (messageLeft.TryGetValue(message.Chat.Id, out var left))
             {
-                delta = message.MessageId - left.OriginalMessageId; 
+                delta = message.MessageId - left.OriginalMessageId;
                 return left.Text;
             }
 

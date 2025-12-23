@@ -4,5 +4,6 @@ namespace Tolltech.BayanMeter
     {
         public required string RootDir { get; set; }
         public string[] AllowedUsers { get; set; } = [];
+        public string? PassKey { get; set; }
     }
 }
