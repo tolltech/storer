@@ -9,12 +9,9 @@ using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using Tolltech.CoreLib;
-using Tolltech.CoreLib.Helpers;
-using Tolltech.TelegramCore;
 using File = System.IO.File;
 
-namespace Tolltech.Storer
+namespace Tolltech.BayanMeter
 {
     public class ServerStorerBotDaemon : IBotDaemon
     {
@@ -27,14 +24,14 @@ namespace Tolltech.Storer
         public ServerStorerBotDaemon(ITelegramClient telegramClient, CustomSettings customSettings)
         {
             this.telegramClient = telegramClient;
-            storerCustomSettingsRaw = customSettings.Raw.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries)
-                .ToDictionary(x => x.Split(new[] { "=" }, StringSplitOptions.RemoveEmptyEntries)[0],
-                    x => x.Split(new[] { "=" }, StringSplitOptions.RemoveEmptyEntries)[1]);
+            storerCustomSettingsRaw = customSettings.Raw.Split([","], StringSplitOptions.RemoveEmptyEntries)
+                .ToDictionary(x => x.Split(["="], StringSplitOptions.RemoveEmptyEntries)[0],
+                    x => x.Split(["="], StringSplitOptions.RemoveEmptyEntries)[1]);
             storerCustomSettings = new StorerCustomSettings
             {
                 RootDir = storerCustomSettingsRaw["RootDir"],
                 AllowedUsers = storerCustomSettingsRaw["AllowedUsers"]
-                    .Split(new[] { " " }, StringSplitOptions.RemoveEmptyEntries)
+                    .Split([" "], StringSplitOptions.RemoveEmptyEntries)
             };
         }
 
@@ -68,11 +65,11 @@ namespace Tolltech.Storer
                         messageLeft[message.Chat.Id] = (message.Text, cnt, message.MessageId);
                     }
 
-                    if (message?.Type != MessageType.Video)
+                    if (message.Type != MessageType.Video)
                         return;
                 }
 
-                log.Info($"RecieveMessage {message.Chat.Id} {message.MessageId}");
+                log.Info($"ReceiveMessage {message.Chat.Id} {message.MessageId}");
 
                 try
                 {
@@ -80,8 +77,7 @@ namespace Tolltech.Storer
                 }
                 catch (Exception e)
                 {
-                    await client.SendTextMessageAsync(message.Chat.Id, $"Error. {e.Message} {e.StackTrace}")
-                        .ConfigureAwait(false);
+                    await client.SendTextMessageAsync(message.Chat.Id, $"Error. {e.Message} {e.StackTrace}", cancellationToken: cancellationToken);
                     throw;
                 }
                 finally
@@ -245,15 +241,14 @@ namespace Tolltech.Storer
             return customFolderName ?? defaultFolderName;
         }
 
-        private static string GetFolderNameFromMessage(Message message)
+        private static string? GetFolderNameFromMessage(Message message)
         {
             var args = GetArgsFromMessageText(message, out _);
 
-            if (args.TryGetValue("folder", out var dir)) return dir;
-            return null;
+            return args.GetValueOrDefault("folder");
         }
 
-        private static string GetFileNameFromMessage(Message messageText)
+        private static string? GetFileNameFromMessage(Message messageText)
         {
             var args = GetArgsFromMessageText(messageText, out var delta);
 
@@ -276,15 +271,15 @@ namespace Tolltech.Storer
 
             if (string.IsNullOrWhiteSpace(messageText)) return new Dictionary<string, string>();
 
-            var args = messageText.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(x => x.Split(new[] { "=" }, StringSplitOptions.RemoveEmptyEntries))
+            var args = messageText.Split([","], StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => x.Split(["="], StringSplitOptions.RemoveEmptyEntries))
                 .Where(x => x.Length == 2)
                 .GroupBy(x => x[0].Trim().ToLower())
                 .ToDictionary(x => x.Key, x => x.First()[1].Trim());
             return args;
         }
 
-        private static string GetPreviousMessageText(Message message, out int? delta)
+        private static string? GetPreviousMessageText(Message message, out int? delta)
         {
             delta = null;
 

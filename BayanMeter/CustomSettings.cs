@@ -1,4 +1,4 @@
-namespace Tolltech.CoreLib
+namespace Tolltech.BayanMeter
 {
     public class CustomSettings
     {

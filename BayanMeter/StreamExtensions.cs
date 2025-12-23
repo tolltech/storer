@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 
-namespace Tolltech.CoreLib.Helpers
+namespace Tolltech.BayanMeter
 {
     public static class StreamExtensions
     {

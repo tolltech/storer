@@ -5,6 +5,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <AssemblyName>Tolltech.BayanMeter</AssemblyName>
     <RootNamespace>Tolltech.BayanMeter</RootNamespace>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>

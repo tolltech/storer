@@ -1,8 +1,8 @@
-namespace Tolltech.Storer
+namespace Tolltech.BayanMeter
 {
     public class StorerCustomSettings
     {
-        public string RootDir { get; set; }
-        public string[] AllowedUsers { get; set; }
+        public required string RootDir { get; set; }
+        public string[] AllowedUsers { get; set; } = [];
     }
 }

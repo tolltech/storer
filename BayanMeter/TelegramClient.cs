@@ -1,18 +1,10 @@
 ﻿using System.IO;
 using Telegram.Bot;
-using Tolltech.CoreLib.Helpers;
 
-namespace Tolltech.TelegramCore
+namespace Tolltech.BayanMeter
 {
-    public class TelegramClient : ITelegramClient
+    public class TelegramClient(TelegramBotClient client) : ITelegramClient
     {
-        private readonly TelegramBotClient client;
-
-        public TelegramClient(TelegramBotClient client)
-        {
-            this.client = client;
-        }
-
         public byte[] GetFile(string fileId)
         {
             var file = client.GetFileAsync(fileId).GetAwaiter().GetResult();

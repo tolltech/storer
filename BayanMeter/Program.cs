@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Threading;
@@ -8,9 +7,6 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
-using Tolltech.TelegramCore;
-using Tolltech.CoreLib;
-using Tolltech.Storer;
 
 namespace Tolltech.BayanMeter
 {
@@ -75,7 +71,7 @@ namespace Tolltech.BayanMeter
 
             var appSettings = JsonConvert.DeserializeObject<AppSettings>(botSettingsStr);
 
-            var botSettings = appSettings?.BotSettings ?? Array.Empty<BotSettings>();
+            var botSettings = appSettings?.BotSettings ?? [];
             Console.WriteLine($"Read {botSettings.Length} bot settings");
 
             using var cts = new CancellationTokenSource();
